@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "ccxt": "^4.4.69",
+    "p-limit": "^6.2.0"
+  }
+}
