@@ -93,9 +93,22 @@ export default class BaseFetcher  {
         // 可扩展邮件/日志通知等逻辑
     }
 
-    async fetchSymbol(symbol, timeframe, options) {
-        throw new Error('必须实现fetchSymbol方法');
-    }
+    async fetchSymbol(symbol, timeframe, { start, end }) {
+        const [market, code] = symbol.split(':');
+        const args = [
+          path.join(__dirname, 'akshare_loader.py'),
+          'ohlcv',
+          code,  // 仅传递数字代码
+          timeframe || '1d',
+          start ? this._formatDate(start) : 'null',
+          end ? this._formatDate(end) : 'null'
+        ].filter(arg => arg !== 'null');
+        
+        // 添加市场校验
+        if (!this.marketMap.has(market)) {
+          throw new Error(`无效市场标识: ${market}`);
+        }
+      }
     normalize(ohlcvItem) {
         // 强制转换为有效时间戳
         const safeTimestamp = Number(ohlcvItem[0]) || Date.now();
@@ -112,3 +125,4 @@ export default class BaseFetcher  {
     }
 }
 
+export { BaseFetcher };

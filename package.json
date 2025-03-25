@@ -1,7 +1,20 @@
 {
   "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha test/*.js",
+    "test:stock": "mocha test/test-stock.js",
+    "test:crypto": "mocha test/test-crypto.js"
+  },
   "dependencies": {
     "ccxt": "^4.4.69",
+    "cross-spawn": "^7.0.6",
+    "dayjs": "^1.11.13",
     "p-limit": "^6.2.0"
+  },
+  "devDependencies": {
+    "chai": "^5.2.0",
+    "mocha": "^11.1.0",
+    "esm": "^3.2.25"
   }
 }

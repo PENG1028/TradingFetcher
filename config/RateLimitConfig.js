@@ -15,14 +15,31 @@ export class RateLimitConfig {
             requestsPerSecond: 5,
             perSymbolDelay: 200,
             ohlcvWeight: 2
+        },
+        'ashare': {
+            requestsPerSecond: 1,
+            perSymbolDelay: 30000,  // 实时数据保持30秒间隔
+            ohlcvWeight: 1
+        },
+        'ashare_hist': {
+            requestsPerSecond: 2,   // 历史数据接口频率更高
+            perSymbolDelay: 1500,   // 1.5秒间隔
+            ohlcvWeight: 1
         }
     };
 
     static getConfig(exchangeId) {
-        return this.PRESETS[exchangeId.toLowerCase()] || {
+        const config = this.PRESETS[exchangeId.toLowerCase()] || {
             requestsPerSecond: 3,   // 默认保守值
             perSymbolDelay: 300,
             ohlcvWeight: 1
         };
+        
+        // 特别处理A股实时数据请求间隔
+        if (exchangeId.toLowerCase() === 'ashare') {
+            config.perSymbolDelay = 30000;
+        }
+        
+        return config;
     }
 }
