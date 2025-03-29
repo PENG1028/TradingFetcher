@@ -1,4 +1,4 @@
-import { AShareFetcher } from '../core/fetchers/AShareFetcher.js'
+const AShareFetcher = require('../core/fetchers/AShareFetcher.js');
 
 // 使用示例
 (async () => {

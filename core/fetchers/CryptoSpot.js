@@ -1,9 +1,11 @@
-import BaseFetcher from './BaseFetcher.js';
-import { RateLimitConfig } from '../../config/RateLimitConfig.js';
+const BaseFetcher = require('./BaseFetcher.js');
+const { inspect } = require('util');
+const fs = require('fs/promises');
+const path = require('path');
+const RateLimitConfig = require('../../config/RateLimitConfig.js');
+const ccxt = require('ccxt')
 
-import ccxt from 'ccxt';
-
-export class CryptoSpotFetcher extends BaseFetcher {
+class CryptoSpotFetcher extends BaseFetcher {
     constructor(exchangeId = 'binance', config = {}) {
         //获取该源的速率限制
         const rateLimit = RateLimitConfig.getConfig(exchangeId);
@@ -50,6 +52,7 @@ export class CryptoSpotFetcher extends BaseFetcher {
             `[/:-]${quoteAsset}(:${quoteAsset})?$`,  // 匹配/USDT或:USDT结尾
             'i'
         );
+        
         const filteredMarkets = Object.values(this.exchange.markets).filter(m => {
             const isValid = m.spot && m.active && m.quote === quoteAsset;
             const hasValidSymbol = symbolPattern.test(m.symbol);
@@ -105,3 +108,5 @@ export class CryptoSpotFetcher extends BaseFetcher {
         }));
     }
 }
+
+module.exports = { CryptoSpotFetcher };

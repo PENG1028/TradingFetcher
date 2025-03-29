@@ -1,6 +1,7 @@
-import pLimit from 'p-limit';
+const pLimit = require('p-limit').default;
+console.log('Type:', typeof pLimit);
 
-export default class BaseFetcher  {
+class BaseFetcher  {
     constructor(config) {
         if (new.target === BaseFetcher ) {
             throw new Error('抽象类不得实例化');
@@ -125,4 +126,4 @@ export default class BaseFetcher  {
     }
 }
 
-export { BaseFetcher };
+module.exports = BaseFetcher;

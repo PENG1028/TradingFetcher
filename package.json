@@ -1,5 +1,5 @@
 {
-  "type": "module",
+  
   "scripts": {
     "start": "node index.js",
     "test": "mocha test/*.js",
@@ -9,12 +9,13 @@
   "dependencies": {
     "ccxt": "^4.4.69",
     "cross-spawn": "^7.0.6",
+    "csv-stringify": "^6.5.2",
     "dayjs": "^1.11.13",
     "p-limit": "^6.2.0"
   },
   "devDependencies": {
     "chai": "^5.2.0",
-    "mocha": "^11.1.0",
-    "esm": "^3.2.25"
+    "esm": "^3.2.25",
+    "mocha": "^11.1.0"
   }
 }

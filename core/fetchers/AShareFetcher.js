@@ -1,10 +1,10 @@
 // File: AShareFetcher.js
-import { spawn } from 'child_process';
-import { BaseFetcher } from './BaseFetcher.js';
-import { fileURLToPath } from 'url';
-import path from 'path';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { spawn } = require('child_process');
+const BaseFetcher = require('./BaseFetcher.js');
+const path = require('path');
+
+const __dirname = path.resolve();
 
 export class AShareFetcher extends BaseFetcher {
     constructor(config = {}) {
@@ -127,31 +127,9 @@ export class AShareFetcher extends BaseFetcher {
         }
         return date.toISOString().split('T')[0].replace(/-/g, '');
       }
-      // 更新fetchSymbol参数处理
-      async fetchSymbol(symbol, timeframe, { start, end }) {
-        const [market, code] = symbol.split(':');
-        const args = [
-          path.join(__dirname, 'akshare_loader.py'),
-          'ohlcv',
-          `${market}${code}`,
-          timeframe || '1d',
-          start ? this._formatDate(start) : 'null',  // 使用null占位符
-          end ? this._formatDate(end) : 'null'
-        ].filter(arg => arg !== 'null');  // 过滤无效占位符
-      }
 
-    // 修改2：增强参数处理逻辑
-    _buildPythonArgs(market, symbol, timeframe, dateRange) {
-        return [
-          path.join(__dirname, 'akshare_loader.py'),
-          'history',
-          market?.toUpperCase() || 'SH',
-          symbol,
-          timeframe,
-          dateRange?.start ? this._formatDate(dateRange.start) : '',
-          dateRange?.end ? this._formatDate(dateRange.end) : ''
-        ].filter(arg => arg !== '');
-      }
+
+    
 
       // 新增核心方法 (必须存在于子类)
       _execPythonProcess = (args) => {

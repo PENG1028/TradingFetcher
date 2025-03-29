@@ -1,5 +1,5 @@
 // file: config/RateLimitConfig.js
-export class RateLimitConfig {
+class RateLimitConfig {
     static PRESETS = {
         'binance': {
             requestsPerSecond: 10,  // 每秒最大请求数
@@ -43,3 +43,4 @@ export class RateLimitConfig {
         return config;
     }
 }
+module.exports = RateLimitConfig

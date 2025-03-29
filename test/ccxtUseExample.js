@@ -1,6 +1,6 @@
 // 安装ccxt库：npm install ccxt
 
-import ccxt from "ccxt";
+const ccxt = require("ccxt");
 
 // 配置区 ========================================
 const CONFIG = {
