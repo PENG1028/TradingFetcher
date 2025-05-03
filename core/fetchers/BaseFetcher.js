@@ -1,5 +1,6 @@
+// core/fetchers/BaseFetcher.js
 const pLimit = require('p-limit').default;
-console.log('Type:', typeof pLimit);
+
 
 class BaseFetcher  {
     constructor(config) {
@@ -20,8 +21,9 @@ class BaseFetcher  {
     }
     async initialize() {
         if (this.initialized) return;
-
-        if (this.config.symbols?.length > 0) {
+        
+        if (this.config.symbols?.length > 0 && this.config.symbols != "ALL") {
+            
             this.symbols = new Set(this.config.symbols);
         } else {
             await this.loadAllSymbols();

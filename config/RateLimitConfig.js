@@ -2,14 +2,16 @@
 class RateLimitConfig {
     static PRESETS = {
         'binance': {
-            requestsPerSecond: 10,  // 每秒最大请求数
+            requestsPerSecond: 9,  // 每秒最大请求数
             perSymbolDelay: 100,   // 不同品种间隔(ms)
-            ohlcvWeight: 1         // 每次OHLCV请求的权重
+            ohlcvWeight: 1,         // 每次OHLCV请求的权重
+            maxLimits: 1000         //单次请求的最大返回数量
         },
         'okx': {
-            requestsPerSecond: 20,
+            requestsPerSecond: 19,
             perSymbolDelay: 50,
-            ohlcvWeight: 1
+            ohlcvWeight: 1, 
+            maxLimits: 300
         },
         'bybit': {
             requestsPerSecond: 5,

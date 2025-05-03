@@ -1,4 +1,6 @@
 const { CryptoSpotFetcher } = require('../core/fetchers/CryptoSpot.js');
+
+
 const { inspect } = require('util');
 const fs = require('fs/promises');
 const path = require('path');
@@ -67,19 +69,20 @@ class CsvWriter {
 
 
 const test = async () => {
-  
-    const fetcher = new CryptoSpotFetcher('binance', {
+    const config = require("../config/start.config.js")
+    console.log(config);
+    const fetcher = new CryptoSpotFetcher('okx', {
         batchSize: 5,         // 覆盖默认配置
         symbols: [],
         quoteAsset: 'USDT',
-        maxLiquidity: 5,
+        maxLiquidity: 3,
         timeout: 30000,
-        proxy: 'http://127.0.0.1:7890' // 添加代理配置
+        proxy: config.proxy // 添加代理配置
     });
 
     const data = await fetcher.fetchData('5m', {
-        since: Date.now() - 3600_000*8,
-        limit: 1000
+        since: Date.now()-60*60*1000,
+        limit: 2
     });
 
     // console.log(inspect(data, { depth: 6, colors: true })) //显示_raw [Array] 详细信息

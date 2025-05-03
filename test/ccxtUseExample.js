@@ -4,10 +4,10 @@ const ccxt = require("ccxt");
 
 // 配置区 ========================================
 const CONFIG = {
-    exchange: 'binance',    // 交易所
+    exchange: 'okx',    // 交易所
     symbol: 'BTC/USDT',     // 交易对
     timeframe: '1h',        // 时间周期
-    limit: 1000,            // 获取条数
+    limit: 3000,            // 获取条数
     proxy: 'http://127.0.0.1:7890',
     retries: 3,             // 重试次数
     retryDelay: 5000,       // 重试间隔(ms)

@@ -1,3 +1,5 @@
+// core/fetchers/CryptoSpot.js
+
 const BaseFetcher = require('./BaseFetcher.js');
 const { inspect } = require('util');
 const fs = require('fs/promises');
@@ -14,10 +16,9 @@ class CryptoSpotFetcher extends BaseFetcher {
             proxy,
             timeout = 30000,
             symbols = [],  // 添加默认值
+            defaultType = 'spot',
             ...baseConfig 
         } = config;
-
-        
 
         // 合并所有配置参数
         super({
@@ -30,6 +31,7 @@ class CryptoSpotFetcher extends BaseFetcher {
             }
         });
 
+        
         this.filterConfig = {
             quoteAsset: quoteAsset.toUpperCase(),
             maxLiquidity: maxLiquidity === 'none' ? Infinity : Number(maxLiquidity)
@@ -40,7 +42,10 @@ class CryptoSpotFetcher extends BaseFetcher {
             enableRateLimit: true,
             timeout: Number(timeout),
             httpProxy: proxy || undefined,  // 防止空字符串
-            rateLimit: 1000 / rateLimit.requestsPerSecond // 正确计算毫秒延迟
+            rateLimit: 1000 / rateLimit.requestsPerSecond, // 正确计算毫秒延迟
+            options: {
+                defaultType: defaultType  
+            }
         });
     }
     async loadAllSymbols() {
@@ -84,29 +89,38 @@ class CryptoSpotFetcher extends BaseFetcher {
     }
 
     async fetchSymbol(symbol, timeframe, { since, limit }) {
+        const maxAttempts = 10;
+        const delayMs = 5000
         console.debug('请求参数:', {
             symbol,
             timeframe,
-            since: new Date(since).toISOString(),
+            sinceDate: new Date(since).toLocaleString(),
+            since: since,
+            defaultType: this.exchange.options.defaultType,
             limit
         });
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return await this.exchange.fetchOHLCV(symbol, timeframe, since, limit);
+            } catch (err) {
+                console.warn(`[fetch attempt ${attempt}/${maxAttempts}] failed: ${err.message}`);
 
-        try {
-            return await this.exchange.fetchOHLCV(symbol, timeframe, since, limit);
-        } catch (e) {
-            console.error('原始错误信息:', {
-                url: this.exchange.lastRequestUrl,
-                error: e.message
-            });
-            throw e;
+                if (attempt < maxAttempts) {
+                    await new Promise(res => setTimeout(res, delayMs));
+                } else {
+                    console.error('[fetch failed] max retry attempts reached');
+                    return null;
+                }
+            }
         }
     }
     normalize(data) {
         return data.map(item => ({
-            ...super.normalize(item),
-            _type: 'spot'
+            ...super.normalize(item)
+            
         }));
     }
+    
 }
 
 module.exports = { CryptoSpotFetcher };

@@ -1,21 +1,56 @@
 {
   
   "scripts": {
-    "start": "node index.js",
-    "test": "mocha test/*.js",
-    "test:stock": "mocha test/test-stock.js",
-    "test:crypto": "mocha test/test-crypto.js"
+  
+    
+  "start": "node index.js",
+  
+    
+  "test": "mocha test/*.js",
+  
+    
+  "test:stock": "mocha test/test-stock.js",
+  
+    
+  "test:crypto": "mocha test/test-crypto.js"
+  
   },
+  
   "dependencies": {
-    "ccxt": "^4.4.69",
-    "cross-spawn": "^7.0.6",
-    "csv-stringify": "^6.5.2",
-    "dayjs": "^1.11.13",
-    "p-limit": "^6.2.0"
+  
+    
+  "ccxt": "^4.4.69",
+  
+    
+  "cross-spawn": "^7.0.6",
+  
+    
+  "csv-stringify": "^6.5.2",
+  
+    
+  "dayjs": "^1.11.13",
+  
+    
+  "p-limit": "^6.2.0",
+  
+    
+  "p-throttle": "^7.0.0",
+  
+    
+  "sqlite3": "^5.1.7"
+  
   },
+  
   "devDependencies": {
-    "chai": "^5.2.0",
-    "esm": "^3.2.25",
-    "mocha": "^11.1.0"
+  
+    
+  "chai": "^5.2.0",
+  
+    
+  "esm": "^3.2.25",
+  
+    
+  "mocha": "^11.1.0"
+  
   }
 }
