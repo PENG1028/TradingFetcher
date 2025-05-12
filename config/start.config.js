@@ -14,7 +14,7 @@ module.exports = {
         
         crypto: {
             exchanges: ['okx','binance'],
-            defaultType: ['swap'],
+            defaultType: ['swap'], // spot：现货；swap：永续合约；future：交割合约；option：期权
             quoteAsset: 'USDT',
             timeframes: ['1m','5m'],
             since: null, // since为ALL时则获取所有交易所已有历史数据；不为ALL时获取从现在到 since的所有数据

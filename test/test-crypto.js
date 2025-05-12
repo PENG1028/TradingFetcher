@@ -73,7 +73,7 @@ const test = async () => {
     console.log(config);
     const fetcher = new CryptoSpotFetcher('okx', {
         batchSize: 5,         // 覆盖默认配置
-        symbols: [],
+        symbols: ['DORA/USDT'],
         quoteAsset: 'USDT',
         maxLiquidity: 3,
         timeout: 30000,

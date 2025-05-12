@@ -1,0 +1,12 @@
+//config/exchangeApi.js.example
+module.exports = {
+    okx: {
+        apiKey: '',
+        secret: '',
+        passphrase: ''
+    },
+    binance: {
+        apiKey: '',
+        secret: ''
+    },
+}

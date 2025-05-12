@@ -6,6 +6,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const RateLimitConfig = require('../../config/RateLimitConfig.js');
 const ccxt = require('ccxt')
+const httpsProxyAgent = require('https-proxy-agent');
 
 class CryptoSpotFetcher extends BaseFetcher {
     constructor(exchangeId = 'binance', config = {}) {
@@ -30,44 +31,42 @@ class CryptoSpotFetcher extends BaseFetcher {
                 batchDelay: rateLimit.batchDelay || 1000
             }
         });
-
-        
+        this.defaultType = defaultType;
         this.filterConfig = {
             quoteAsset: quoteAsset.toUpperCase(),
             maxLiquidity: maxLiquidity === 'none' ? Infinity : Number(maxLiquidity)
         };
 
+        const agent = proxy ? new httpsProxyAgent(proxy) : null;
         // 配置交易所实例
         this.exchange = new ccxt[exchangeId]({
             enableRateLimit: true,
             timeout: Number(timeout),
-            httpProxy: proxy || undefined,  // 防止空字符串
+            agent,
             rateLimit: 1000 / rateLimit.requestsPerSecond, // 正确计算毫秒延迟
             options: {
-                defaultType: defaultType  
+                defaultType: defaultType
             }
         });
+
+        
     }
     async loadAllSymbols() {
+        await this.retry(async () => {
         await this.exchange.loadMarkets();
         const { quoteAsset, maxLiquidity } = this.filterConfig;
         
-        // 动态创建多分隔符正则表达式
-        const symbolPattern = new RegExp(
-            `[/:-]${quoteAsset}(:${quoteAsset})?$`,  // 匹配/USDT或:USDT结尾
-            'i'
-        );
-        
         const filteredMarkets = Object.values(this.exchange.markets).filter(m => {
-            const isValid = m.spot && m.active && m.quote === quoteAsset;
-            const hasValidSymbol = symbolPattern.test(m.symbol);
+            const isTypeMatch = Array.isArray(this.defaultType) 
+                ? this.defaultType.includes(m.type)
+                : this.defaultType === m.type;
             
-            // 仅在不匹配时显示警告
-            if (isValid && !hasValidSymbol) {
-                console.warn(`交易对格式异常: ${m.symbol} 报价资产正确但符号格式不标准`);
-            }
+            const isValid = 
+            isTypeMatch && 
+            m.active && 
+            m.quote === quoteAsset;
             
-            return isValid && hasValidSymbol;
+            return isValid;
         });
         // 按流动性排序
         const sortedSymbols = filteredMarkets
@@ -75,20 +74,41 @@ class CryptoSpotFetcher extends BaseFetcher {
             .map(m => m.symbol);
         // 应用数量限制
         this.symbols = new Set(
-            maxLiquidity > 0 ? sortedSymbols.slice(0, maxLiquidity) : sortedSymbols
+            (maxLiquidity > 0 ? sortedSymbols.slice(0, maxLiquidity) : sortedSymbols)
+            .map(symbol => symbol.split(':')[0])  // 移除 :XXX 部分并合并重复项
         );
         console.log([
             `已过滤报价资产: ${quoteAsset}`,
             `流动性排序交易对: ${sortedSymbols.length}个`,
             `保留数量: ${maxLiquidity === Infinity ? '全部' : maxLiquidity}`
         ].join(' | '));
+    }, 10);
     }
     // 并行处理钩子
     async preFetch(symbol) {
-        await this.delay(this.config.rateLimit.perSymbolDelay);
+        await this.retry(async () => {
+            await this.delay(this.config.rateLimit.perSymbolDelay);
+        }, 10);
+    }
+
+    async retry(fn, retries = 3, delay = 10000) {
+        let tried = 0;
+        while (tried <= retries) {
+            try {
+                return await fn();
+            } catch (error) {
+                if (tried === retries) {
+                    throw error;
+                }
+                tried += 1;
+                console.error(`Retry attempt ${tried} failed`, error);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
     }
 
     async fetchSymbol(symbol, timeframe, { since, limit }) {
+        
         const maxAttempts = 10;
         const delayMs = 5000
         console.debug('请求参数:', {
