@@ -356,7 +356,7 @@ class TradingControl {
         if (exchange === "ALL") {
             return this.getTotalNetAsset('okx') + this.getTotalNetAsset('binance');
         }
-        return this.getAvailableBalance(exchange) + this.getTotalPnL(exchange);
+        return this.getAvailableBalance(exchange) + this.getUsedMargin(exchange) + this.getTotalPnL(exchange);
     }
     getAvailableBalance(exchange) {
         return this.balance[exchange] - this.getUsedMargin(exchange);
@@ -504,38 +504,37 @@ class TradingControl {
 
         // console.log(this.accountData);
 
-        const accountDataPos = this.accountData.positions?.[exchange]?.[symbol];
         // ✅ 等待账户同步更新
-
-        const DEADLINE = Date.now() + 10_000;   // 最多等 10s
+        
+        const DEADLINE = Date.now() + 15_000;   // 最多等 15s
         let qty = 0;
-
+        
         while (Date.now() < DEADLINE) {
             const p = this.accountMonitor.getAccountMap()
-                .positions?.[exchange]?.[symbol];
+            .positions?.[exchange]?.[symbol];
             qty = p?.qty || 0;
             if (qty > 0) break;                 // ✓ 拿到了
-
+            
             await new Promise(r => setTimeout(r, 200)); // 间隔短点
         }
-
+        
         if (qty === 0) {
-            console.warn(`[ENTRY] ${exchange} ${symbol} 等待 8s 仍无 qty，同步失败`);
+            console.warn(`[ENTRY] ${exchange} ${symbol} 等待 15s 仍无 qty，同步失败`);
         }
         if (qty <= 0) {
             console.warn(`[ENTRY-WARN] ${exchange} ${symbol} 多次尝试后仍无法获取仓位 qty`);
             this.ordering[exchange].entry[symbol] = false;
             return { success: false, error: 'qty-invalid' };
         }
-
-
+        
+        
         let success = false;
         for (let i = 0; i < 10; i++) {
             await new Promise(r => setTimeout(r, 200));
-
+            
             // ✅ 每轮重新拉账户状态
             this.accountData = this.accountMonitor.getAccountMap();
-
+            
             const check = this.accountData?.positions?.[exchange]?.[symbol];
             const remQty = check?.qty || 0;
             if (remQty >= qty * 0.95) {
@@ -544,7 +543,8 @@ class TradingControl {
             }
         }
         this.accountData = this.accountMonitor.getAccountMap();
-
+        
+        const accountDataPos = this.accountData.positions?.[exchange]?.[symbol];
         const pos = this.accountData?.positions?.[exchange]?.[symbol];
 
 
@@ -558,6 +558,7 @@ class TradingControl {
         this.ordering[exchange].entry[symbol] = false;
 
         // recorder 部分
+        
 
         if (!accountDataPos) return { success: false, error: 'position-data-missing' };
 
@@ -1153,6 +1154,14 @@ class TradingControl {
             /* 2-C. 只减仓模式下已持双腿 ⇒ 跳过 */
             const okxPos = this.positions.okx?.[sym];
             const binPos = this.positions.binance?.[sym];
+
+            /* 2-D.正在挂 entry/exit 单 或 持仓中  ⇒ 跳过 */
+            const busy =
+                this.positions.okx?.[sym] || this.positions.binance?.[sym] ||
+                this.ordering.okx.entry[sym] || this.ordering.okx.exit[sym] ||
+                this.ordering.binance.entry[sym] || this.ordering.binance.exit[sym] ||
+                (this.pairPending[sym] && Date.now() - this.pairPending[sym] < TradingControl.LEG_GRACE_MS);
+            if (busy) continue;
 
             if (okxPos?.qty > 0 && binPos?.qty > 0 && REDUCE_ONLY_MODE) {
                 // console.log(`[SKIP] ${sym} 已持仓且 REDUCE_ONLY_MODE`);

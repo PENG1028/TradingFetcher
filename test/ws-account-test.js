@@ -140,6 +140,7 @@ class AccountMonitor {
         this.listenKey = null;
         this.listenKeyRenewTimer = null;
         this.binanceTimeDelta = 0;
+        this.snapshotTimer = null; // ✔ 用于 Binance 账户轮询
 
     }
 
@@ -149,6 +150,13 @@ class AccountMonitor {
     async start() {
         await this._syncBinanceTime();
         await this.fetchOkxContractValueMap();
+
+        // ✅ 保证不重复设置
+        if (this.snapshotTimer) clearInterval(this.snapshotTimer);
+        this.snapshotTimer = setInterval(() => {
+            this._snapshotBinanceAccount().catch(console.error);
+        }, 15_000);
+
         await Promise.all([
             this._manageConnection({ type: 'OKX', connectFn: this._connectOKX.bind(this) }),
             this._manageConnection({ type: 'BINANCE', connectFn: this._connectBinance.bind(this) })
@@ -183,7 +191,7 @@ class AccountMonitor {
 
         const reconnect = async () => {
             try {
-                await connectFn();
+                connectFn();
                 retry = 0; // success → reset backoff
             } catch (err) {
                 console.error(`[${type}] connect error:`, err.message);
@@ -516,20 +524,22 @@ class AccountMonitor {
      * BINANCE Futures user‑data stream (ACCOUNT_UPDATE + POSITION)   
      * ================
      * =======================================*/
-    _connectBinance() {
+    async _connectBinance() {
+
+
         if (this.binanceWS && this.binanceWS.readyState === WebSocket.OPEN) {
             console.warn('[Binance] 重连请求忽略，已有连接');
             return;
         }
 
-        return new Promise(async (resolve, reject) => {
+        {
 
             /* ----------------------------  PATCH ①  ---------------------------- */
             let noMsgTimeout = null;
             let backoff = 2_000;               // 指数退避
             const MAX_BACKOFF = 60_000;
             /* --------------------------  PATCH END  --------------------------- */
-
+            await this._syncBinanceTime();
             // 1)  create / renew listenKey via REST
             this.listenKey = await this._createListenKey();
             // 2)  open WS
@@ -540,14 +550,8 @@ class AccountMonitor {
             let connected = false;                         // 标记
 
 
-            ws.on('open', async () => {
-                console.log('[Binance] WS opened');
-
-                setInterval(() => {
-                    this._snapshotBinanceAccount();
-                }, 30_000);  // 每 30s 主动同步   // ← 初始填充
-                connected = true;                     // ✅ 到这一步才算成功连接完成
-                resolve();                              // 若你想在这里结束 Promise
+            ws.on('open', () => {
+                this._snapshotBinanceAccount();
             });
 
             ws.on('ping', (data) => {
@@ -608,13 +612,15 @@ class AccountMonitor {
 
             ws.on('close', () => {
                 console.warn('[Binance] WS closed');
+
                 clearInterval(this.listenKeyRenewTimer);
 
-                if (!connected) {                            // 首连还没成功 ⇒ 让 Promise 失败
-                    console.warn('[Binance-account] 首次连接尚未完成就断开，稍后重连');
-                }
+                
 
-
+                // 主动触发一次重连（与 error 分支保持一致）
+                const delay = backoff;
+                backoff = Math.min(backoff * 2, MAX_BACKOFF);
+                setTimeout(() => this._connectBinance().catch(console.error), delay);
             });
 
             ws.on('error', (err) => {
@@ -631,14 +637,11 @@ class AccountMonitor {
                 /* --------------------------  PATCH END --------------------------- */
 
             });
-            ws.on('error', (err) => {
-                console.error('[Binance] WS error', err.message);
-                if (ws.readyState === WebSocket.OPEN) ws.close(); // 会走到 'close' → restart
-            });
+
 
             // 3)  schedule listen‑key keep‑alive every 30 min
             this.listenKeyRenewTimer = setInterval(() => this._keepAliveListenKey(), 30 * 60 * 1_000);
-        });
+        };
     }
 
     async _syncBinanceTime() {
@@ -647,6 +650,8 @@ class AccountMonitor {
             const { serverTime } = await res.json();
             this.binanceTimeDelta = serverTime - Date.now();
             console.log('[Binance] 时间差 Δt =', this.binanceTimeDelta, 'ms');
+            this.binanceTimeDelta = serverTime - Date.now();/*  */
+            this._lastTimeSync = Date.now();          // ★
         } catch (e) {
             console.warn('[Binance] 获取服务器时间失败');
             this.binanceTimeDelta = 0;
@@ -655,8 +660,18 @@ class AccountMonitor {
 
 
     async _snapshotBinanceAccount() {
+
+        // ... fetch json ...
+        const newPos = {};                 // ← 新建临时表
+
         const endpoint = '/fapi/v2/account';
-        const ts = Date.now() + this.binanceTimeDelta;
+
+        const now = Date.now();
+        if (now - this._lastTimeSync > 10 * 60_000) {     // 10 min 重新同步
+            await this._syncBinanceTime();
+        }
+        const ts = now + this.binanceTimeDelta;
+
         const query = `timestamp=${ts}&recvWindow=10000`;  // 👈 多加 recvWindow 提高容错
 
         const sig = crypto.createHmac('sha256', this.binanceCred.secret)
@@ -677,7 +692,7 @@ class AccountMonitor {
 
         // 余额
         const usdt = json.assets.find(a => a.asset === 'USDT');
-        if (usdt) this.balance.binance = parseFloat(usdt.availableBalance);
+        if (usdt) this.balance.binance = parseFloat(usdt.walletBalance);
 
         // 持仓
         for (const p of json.positions) {
@@ -688,7 +703,8 @@ class AccountMonitor {
             const entry = parseFloat(p.entryPrice);
             const lev = parseFloat(this.defLev);
             const margin = Math.abs(qty * entry) / lev;
-            this.positions.binance[symbol] = {
+
+            newPos[symbol] = {
                 symbol,
                 direction: dir,
                 entryPrice: entry,
@@ -700,6 +716,10 @@ class AccountMonitor {
                 ts: Date.now()
             };
         }
+
+        // ✅ 一次性替换，自动清掉 0 仓位
+        this.positions.binance = newPos;
+
         this._notify();
     }
 

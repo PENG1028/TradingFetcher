@@ -2,7 +2,7 @@
 const ccxt = require('ccxt');
 const fetch = require('node-fetch');
 const httpsProxyAgent = require('https-proxy-agent');
-
+const OrderLogger = require('../core/server/orderLogger.js'); // ⬅️ 顶部引入
 
 class TradeExecutor {
     //okx 合约 以张数为单位
@@ -16,6 +16,7 @@ class TradeExecutor {
                 secret: apiKeys.okx.secret,
                 password: apiKeys.okx.passphrase,
                 enableRateLimit: true,
+                timeout: 8000, // ✅ 添加超时限制（建议 8~10 秒）
                 httpProxy: proxy,
                 options: {
                     defaultType: 'swap' // ✅ 添加这句，明确使用合约市场
@@ -35,7 +36,7 @@ class TradeExecutor {
 
         };
         // ✅ 立即加载市场数据（只加载一次）
-        Promise.all([
+        this.ready = Promise.all([
             this.exchanges.okx.loadMarkets(),
             this.exchanges.binance.loadMarkets()
         ]).then(() => {
@@ -47,8 +48,11 @@ class TradeExecutor {
 
     // 下单接口（支持市价）
     async placeOrder(exchangeName, symbol, isClose, direction, amount, type = 'market', leverage = 10) {
+        await this.ready; // ✅ 等待市场加载完
         const exchange = this.exchanges[exchangeName];
         if (!exchange) throw new Error(`Unsupported exchange: ${exchangeName}`);
+
+        const start = Date.now();
 
         try {
             let formattedSymbol = symbol;
@@ -79,7 +83,6 @@ class TradeExecutor {
             if (exchange.has['setLeverage']) {
                 await exchange.setLeverage(leverage, formattedSymbol);
             }
-
             const order = await exchange.createOrder(
                 formattedSymbol,
                 type,
@@ -88,11 +91,44 @@ class TradeExecutor {
                 undefined,
                 params
             );
-
+            const ms = Date.now() - start;
+            OrderLogger.log({
+                exchange: exchangeName,
+                symbol,
+                direction,
+                isClose,
+                amount,
+                result: 'success',
+                ms
+            });
             // console.log(`[ORDER] ${exchangeName} ${symbol} ${isClose ? 'close' : 'entry'}-${direction} ${amount} 成功`, order);
             return order;
 
         } catch (err) {
+            const ms = Date.now() - start;
+
+            let errorMsg = err.message;
+            if (err.response && typeof err.response === 'object') {
+                try {
+                    const resText = await err.response.text();
+                    errorMsg += ' | ' + resText;
+                } catch (e) {
+                    // fallback silently
+                }
+            }
+
+            OrderLogger.log({
+                exchange: exchangeName,
+                symbol,
+                direction,
+                isClose,
+                amount,
+                result: 'fail',
+                ms,
+                error: errorMsg
+            });
+
+
             console.error(`[ORDER-ERROR] ${exchangeName} ${symbol} ${isClose ? 'close' : 'entry'}-${direction} ${amount}`, err.message);
             return null;
         }
@@ -133,11 +169,11 @@ if (require.main === module) {
     });
 
     (async () => {
-        const exchange = 'binance';
-        const symbol = 'ARC/USDT';
+        const exchange = 'okx';
+        const symbol = 'API3/USDT';
         const isClose = false; // 为true时为平仓
         const direction = 'short'
-        const amount = 70; // 小额数量，确保大于 minNotional
+        const amount = 10; // 小额数量，确保大于 minNotional
 
         console.log(`[TEST] 尝试下单 ${exchange} ${symbol} ${isClose} ${direction} ${amount}`);
 
